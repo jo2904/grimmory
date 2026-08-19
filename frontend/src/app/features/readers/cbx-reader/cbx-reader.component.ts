@@ -1155,6 +1155,16 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
     this.isLoadingMore.set(true);
     const endIndex = Math.min(lastLoadedIndex + this.preloadCount + 1, this.pages().length);
 
+    // Trimming the DOM window below can drop pages above the viewport (see
+    // trimInfiniteScrollPages). With overflow-anchor disabled on this container,
+    // the browser won't compensate on its own, so anchor on the current page
+    // and restore its position after the trim — same technique as loadPreviousPages.
+    const container = this.getImageScrollContainer();
+    const anchorEl = container?.querySelector(
+      `.infinite-scroll-wrapper img.page-image[data-page="${this.currentPage()}"]`
+    ) as HTMLElement | null;
+    const beforeTop = anchorEl?.getBoundingClientRect().top;
+
     requestAnimationFrame(() => {
       const added: number[] = [];
       for (let i = lastLoadedIndex + 1; i < endIndex; i++) {
@@ -1163,6 +1173,12 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
       this.infiniteScrollPages.update(p => [...p, ...added]);
       this.trimInfiniteScrollPages('tail');
       this.isLoadingMore.set(false);
+
+      if (container && anchorEl && beforeTop !== undefined) {
+        this.afterNextPaint(() => {
+          container.scrollTop += anchorEl.getBoundingClientRect().top - beforeTop;
+        });
+      }
     });
   }
 
