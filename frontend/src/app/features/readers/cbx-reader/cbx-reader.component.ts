@@ -184,6 +184,8 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
   private readerLayoutGraceUntilMs = signal(0);
   /** Invalidates delayed scroll/layout work after book or scroll-mode changes. */
   private readerLayoutGeneration = signal(0);
+  /** Invalidates a pending loadMorePages() append when infiniteScrollPages is wholesale replaced (e.g. ensurePageLoaded via goToPage). */
+  private infiniteScrollWindowVersion = 0;
   /** Avoid continuation hint flicker when scroll height changes (hysteresis). */
   private continuationHintLatched = signal(false);
 
@@ -1156,8 +1158,14 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
     const endIndex = Math.min(lastLoadedIndex + this.preloadCount + 1, this.pages().length);
     const layoutGen = this.readerLayoutGeneration();
     const scrollModeAtStart = this.scrollMode();
+    const windowVersion = this.infiniteScrollWindowVersion;
 
     requestAnimationFrame(() => {
+      if (windowVersion !== this.infiniteScrollWindowVersion) {
+        // infiniteScrollPages was wholesale replaced (e.g. goToPage) while this frame was
+        // pending — that reset already owns isLoadingMore, don't touch it here.
+        return;
+      }
       if (layoutGen !== this.readerLayoutGeneration() || this.scrollMode() !== scrollModeAtStart) {
         this.isLoadingMore.set(false);
         return;
@@ -1185,7 +1193,14 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
 
       if (container && anchorEl?.isConnected && beforeTop !== undefined) {
         this.afterNextPaint(() => {
+          if (windowVersion !== this.infiniteScrollWindowVersion) {
+            return;
+          }
           if (layoutGen !== this.readerLayoutGeneration() || this.scrollMode() !== scrollModeAtStart) {
+            this.isLoadingMore.set(false);
+            return;
+          }
+          if (!anchorEl.isConnected) {
             this.isLoadingMore.set(false);
             return;
           }
@@ -1700,7 +1715,11 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
     for (let i = startIndex; i < endIndex; i++) {
       pages.push(i);
     }
+    // Replacing the window wholesale invalidates any in-flight loadMorePages() append
+    // (e.g. jumping to a page via goToPage while auto-loading near the scroll edge).
+    this.infiniteScrollWindowVersion++;
     this.infiniteScrollPages.set(pages);
+    this.isLoadingMore.set(false);
   }
 
   onImageClick(): void {
