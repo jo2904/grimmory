@@ -184,7 +184,8 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
   private readerLayoutGraceUntilMs = signal(0);
   /** Invalidates delayed scroll/layout work after book or scroll-mode changes. */
   private readerLayoutGeneration = signal(0);
-  /** Invalidates a pending loadMorePages() append when infiniteScrollPages is wholesale replaced (e.g. ensurePageLoaded via goToPage). */
+  /** Invalidates a pending loadMorePages() append whenever infiniteScrollPages is wholesale replaced
+   *  (ensurePageLoaded, scroll-mode teardown/init) rather than appended-to in place. */
   private infiniteScrollWindowVersion = 0;
   /** Avoid continuation hint flicker when scroll height changes (hysteresis). */
   private continuationHintLatched = signal(false);
@@ -1065,6 +1066,7 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
         clearTimeout(this.infiniteScrollPageDebounceTimer);
         this.infiniteScrollPageDebounceTimer = null;
       }
+      this.infiniteScrollWindowVersion++;
       this.infiniteScrollPages.set([]);
       this.isLoadingMore.set(false);
     }
@@ -1113,6 +1115,7 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
     for (let i = startIndex; i < endIndex; i++) {
       pages.push(i);
     }
+    this.infiniteScrollWindowVersion++;
     this.infiniteScrollPages.set(pages);
   }
 
