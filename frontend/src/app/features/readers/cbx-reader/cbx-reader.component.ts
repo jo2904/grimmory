@@ -1117,6 +1117,7 @@ export class CbxReaderComponent implements OnInit, OnDestroy {
     }
     this.infiniteScrollWindowVersion++;
     this.infiniteScrollPages.set(pages);
+    this.isLoadingMore.set(false);
   }
 
   onScroll(event: Event): void {
